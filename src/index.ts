@@ -2,9 +2,13 @@
 import { Command as CommanderProgram } from 'commander';
 import dotenv from 'dotenv';
 import { Command } from './core/Command.js';
+import { EnvValidator } from './utils/EnvValidator.js';
 
 // Load environment variables
 dotenv.config();
+
+// Validate environment variables at startup
+EnvValidator.validateOrExit();
 
 // Initialize Commander
 const program = new CommanderProgram();
@@ -34,40 +38,46 @@ class CommandRegistry {
         if (command.name === 'gemini') {
             cmd.option('-f, --file <path>', 'File to include in prompt');
         } else if (command.name === 'image-generate') {
-            cmd.option('-s, --size <size>', 'Image size (e.g., 1024x1024)', '1024x1024');
+            cmd.option('-s, --size <size>', 'Image size (1024x1024, 1792x1024, or 1024x1792)', '1024x1024');
+        } else if (command.name === 'web-search') {
+            cmd.option('--mode <mode>', 'Search mode: agentic (default), weak, or deep-research', 'agentic');
+            cmd.option('--reasoning <level>', 'Reasoning level: low, medium (default), high', 'medium');
+            cmd.option('--model <model>', 'Override model (e.g., gpt-4o, gpt-4o-mini)');
+        } else if (command.name === 'screenshot') {
+            cmd.option('--full', 'Full page screenshot (default: true)');
+            cmd.option('--viewport-only', 'Capture only the viewport instead of full page');
+            cmd.option('--selector <css>', 'Screenshot specific element');
+            cmd.option('--wait <ms>', 'Additional wait after load (default: 1500)');
+            cmd.option('--viewport <size>', 'Viewport size (default: 1440x900)', '1440x900');
+            cmd.option('--no-animations', 'Disable CSS animations');
+            cmd.option('--out <dir>', 'Output directory (default: images/screenshots)');
         }
 
         cmd.action(async (...args: any[]) => {
-            // Commander args: [arg1, arg2, ..., options, commandObject]
-            // We want to pass a standardized object or just the raw args to execute.
-            // Let's pass an object combining positional args and options.
-
-            const commandObj = args.pop(); // last arg is command objects
-            const options = args.pop(); // second to last is options
-
-            // Map positional args if possible? 
-            // For 'web-search <query>', args[0] is query.
-            // Let's pass a merged object: { ...options, args: [...positionalArgs] }
-            // Or if we know the argument names...
-            // Simple approach: pass { query: args[0], ...options } if we know it's web-search.
-            // Generic approach: pass { args: args, options: options }
-
-            // Update: WebSearchCommand expects 'query' in the input object.
-            // Let's try to pass { query: args[0] } if it's web-search.
-
-            const payload: any = { options, args };
-            if (command.name === 'web-search' && args.length > 0) {
-                payload.query = args[0];
-            } else if (command.name === 'gemini' && args.length > 0) {
-                payload.prompt = args[0];
-            } else if (command.name === 'image-generate' && args.length > 0) {
-                payload.prompt = args[0];
-            }
-
             try {
+                // Commander args: [arg1, arg2, ..., options, commandObject]
+                const commandObj = args.pop(); // last arg is command object
+                const options = args.pop(); // second to last is options
+
+                // Build payload with query/prompt mapped correctly
+                const payload: any = { options, args };
+                if (command.name === 'web-search' && args.length > 0) {
+                    payload.query = args[0];
+                } else if (command.name === 'gemini' && args.length > 0) {
+                    payload.prompt = args[0];
+                } else if (command.name === 'image-generate' && args.length > 0) {
+                    payload.prompt = args[0];
+                } else if (command.name === 'screenshot' && args.length > 0) {
+                    payload.url = args[0];
+                }
+
                 await command.execute(payload);
-            } catch (error) {
-                console.error(`Error executing command ${command.name}:`, error);
+            } catch (error: any) {
+                // Fallback error handler (commands should handle their own errors)
+                console.error(`\n❌ Unexpected error in ${command.name}:`, error.message);
+                if (process.env.DEBUG) {
+                    console.error(error);
+                }
                 process.exit(1);
             }
         });
@@ -76,12 +86,21 @@ class CommandRegistry {
 
 export const registry = new CommandRegistry();
 
+// Register commands
 import { WebSearchCommand } from './commands/WebSearchCommand.js';
 import { GeminiCommand } from './commands/GeminiCommand.js';
 import { ImageGenerateCommand } from './commands/ImageGenerateCommand.js';
-registry.register(new WebSearchCommand(), '<query>');
-registry.register(new GeminiCommand(), '<prompt>');
-registry.register(new ImageGenerateCommand(), '<prompt>');
+import { ScreenshotCommand } from './commands/ScreenshotCommand.js';
+
+try {
+    registry.register(new WebSearchCommand(), '<query>');
+    registry.register(new GeminiCommand(), '<prompt>');
+    registry.register(new ImageGenerateCommand(), '<prompt>');
+    registry.register(new ScreenshotCommand(), '<url>');
+} catch (error: any) {
+    console.error(`\n❌ Failed to initialize commands: ${error.message}`);
+    process.exit(1);
+}
 
 // Parse arguments
 program.parse(process.argv);
