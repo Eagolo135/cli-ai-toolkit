@@ -1,0 +1,18 @@
+{
+  "name": "@cli-ai-toolkit/core",
+  "version": "1.0.0",
+  "description": "Core interfaces and types for CLI AI Toolkit",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["cli", "ai", "toolkit", "core"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

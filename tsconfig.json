@@ -1,23 +1,14 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
+  // Root tsconfig for monorepo
   "compilerOptions": {
-    /* File Layout */
-    "rootDir": "./src",
-    "outDir": "./dist",
-    /* Environment Settings */
+    "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "target": "ES2022",
-    "lib": [
-      "ES2022"
-    ],
-    /* Output Options */
-    "sourceMap": true,
+    "lib": ["ES2022"],
     "declaration": true,
-    "removeComments": true,
+    "sourceMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    /* Strict Typechecking */
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -29,15 +20,18 @@
     "alwaysStrict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    /* Application Specific */
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/utils" },
+    { "path": "./packages/websearch" },
+    { "path": "./packages/feedback" },
+    { "path": "./packages/screenshot" },
+    { "path": "./packages/imagegen" },
+    { "path": "./packages/cli" },
+    { "path": "./packages/agent" }
+  ]
 }

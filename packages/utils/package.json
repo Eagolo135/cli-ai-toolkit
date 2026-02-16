@@ -1,0 +1,22 @@
+{
+  "name": "@cli-ai-toolkit/utils",
+  "version": "1.0.0",
+  "description": "Shared utilities for CLI AI Toolkit",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["cli", "ai", "toolkit", "utils"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3"
+  }
+}

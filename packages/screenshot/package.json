@@ -1,0 +1,23 @@
+{
+  "name": "@cli-ai-toolkit/screenshot",
+  "version": "1.0.0",
+  "description": "Website screenshot library using Playwright",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["screenshot", "playwright", "browser"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cli-ai-toolkit/utils": "*",
+    "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3"
+  }
+}

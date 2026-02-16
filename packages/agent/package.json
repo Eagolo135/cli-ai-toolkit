@@ -1,0 +1,27 @@
+{
+  "name": "@cli-ai-toolkit/agent",
+  "version": "1.0.0",
+  "description": "Orchestrator for AI toolkit (future implementation)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["agent", "orchestrator"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cli-ai-toolkit/core": "*",
+    "@cli-ai-toolkit/utils": "*",
+    "@cli-ai-toolkit/websearch": "*",
+    "@cli-ai-toolkit/feedback": "*",
+    "@cli-ai-toolkit/screenshot": "*",
+    "@cli-ai-toolkit/imagegen": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3"
+  }
+}
