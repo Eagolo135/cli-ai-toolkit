@@ -11,6 +11,36 @@ export interface ImageComparisonResult {
     notes: string;
 }
 
+export interface UICritiqueItem {
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    category: 'layout' | 'typography' | 'colors' | 'spacing' | 'sizing' | 'alignment' | 'borders' | 'other';
+    element: string; // Specific UI element (e.g., "Header navigation", "Primary button")
+    issue: string; // What's wrong
+    expected: string; // What it should be
+    actual: string; // What it currently is
+}
+
+export interface UICritique {
+    items: UICritiqueItem[];
+    summary: string;
+    totalIssues: number;
+}
+
+export interface UICritiqueItem {
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    category: 'layout' | 'typography' | 'colors' | 'spacing' | 'sizing' | 'alignment' | 'borders' | 'other';
+    element: string; // Specific UI element (e.g., "Header navigation", "Primary button")
+    issue: string; // What's wrong
+    expected: string; // What it should be
+    actual: string; // What it currently is
+}
+
+export interface UICritique {
+    items: UICritiqueItem[];
+    summary: string;
+    totalIssues: number;
+}
+
 export class GeminiService {
     private apiKey: string;
     private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -151,6 +181,130 @@ Respond in this EXACT JSON format (no markdown, no code blocks):
             },
             { maxRetries: 2, timeoutMs: 70000 },
             'Gemini Vision API'
+        );
+    }
+
+    /**
+     * Generate detailed UI critique comparing two screenshots
+     * Produces a prioritized punch list of concrete UI differences
+     * @param targetImagePath - Path to the target/reference image
+     * @param candidateImagePath - Path to the candidate image
+     * @param context - Optional context about what's being compared
+     * @returns Detailed UI critique with actionable items
+     */
+    async generateUICritique(
+        targetImagePath: string,
+        candidateImagePath: string,
+        context?: string
+    ): Promise<UICritique> {
+        return APIResilience.executeWithRetry(
+            async () => {
+                // Read and encode images as base64
+                const targetBuffer = await fs.readFile(targetImagePath);
+                const candidateBuffer = await fs.readFile(candidateImagePath);
+                
+                const targetBase64 = targetBuffer.toString('base64');
+                const candidateBase64 = candidateBuffer.toString('base64');
+
+                // Determine MIME type
+                const targetMime = targetImagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+                const candidateMime = candidateImagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+                const url = `${this.baseUrl}/gemini-2.0-flash-lite:generateContent?key=${this.apiKey}`;
+
+                const prompt = `You are a UI/UX expert analyzing screenshot differences. Compare these two screenshots in EXTREME DETAIL.
+
+TARGET (Expected/Reference):
+[First image]
+
+CANDIDATE (Actual/Current):
+[Second image]
+${context ? `\nCONTEXT: ${context}` : ''}
+
+Identify 5-10 CONCRETE, ACTIONABLE UI differences. Focus on:
+- Layout: positioning, margins, padding, spacing
+- Typography: font family, size, weight, line-height, letter-spacing
+- Colors: hex values, opacity, gradients
+- Sizing: width, height, dimensions of elements
+- Alignment: horizontal/vertical alignment issues
+- Borders: radius, width, color, style
+- Specific measurements where possible
+
+For each difference, identify:
+1. The SPECIFIC UI element (e.g., "Header logo", "Primary CTA button", "Navigation menu")
+2. The EXACT issue (e.g., "padding-left is 12px")
+3. What it SHOULD be (from target)
+4. What it ACTUALLY is (in candidate)
+5. Priority level
+
+Prioritize by visual impact:
+- critical: breaks layout or makes UI unusable
+- high: very noticeable, affects user experience
+- medium: noticeable but minor impact
+- low: subtle difference, minimal impact
+
+Respond in this EXACT JSON format (no markdown, no code blocks):
+{
+  "summary": "Brief 1-2 sentence overview of differences",
+  "items": [
+    {
+      "priority": "critical|high|medium|low",
+      "category": "layout|typography|colors|spacing|sizing|alignment|borders|other",
+      "element": "Specific UI element name",
+      "issue": "What's wrong",
+      "expected": "What target shows (be specific with values)",
+      "actual": "What candidate shows (be specific with values)"
+    }
+  ]
+}`;
+
+                const response = await axios.post(
+                    url,
+                    {
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inline_data: {
+                                        mime_type: targetMime,
+                                        data: targetBase64
+                                    }
+                                },
+                                {
+                                    inline_data: {
+                                        mime_type: candidateMime,
+                                        data: candidateBase64
+                                    }
+                                }
+                            ]
+                        }]
+                    },
+                    {
+                        timeout: 60000,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                const content = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (!content) {
+                    throw new Error('No response generated by Gemini Vision API');
+                }
+
+                // Parse JSON response
+                const cleaned = content.trim().replace(/```json\s*/g, '').replace(/```\s*/g, '');
+                const result = JSON.parse(cleaned);
+
+                return {
+                    items: result.items || [],
+                    summary: result.summary || 'No summary provided',
+                    totalIssues: (result.items || []).length
+                };
+            },
+            { maxRetries: 2, timeoutMs: 70000 },
+            'Gemini Vision API (UI Critique)'
         );
     }
 }
