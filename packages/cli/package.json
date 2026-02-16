@@ -1,0 +1,33 @@
+{
+  "name": "@cli-ai-toolkit/cli",
+  "version": "1.0.0",
+  "description": "CLI wrapper for AI toolkit",
+  "main": "dist/index.js",
+  "bin": {
+    "cli-ai-toolkit": "./dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["cli", "ai", "toolkit"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cli-ai-toolkit/core": "*",
+    "@cli-ai-toolkit/utils": "*",
+    "@cli-ai-toolkit/websearch": "*",
+    "@cli-ai-toolkit/feedback": "*",
+    "@cli-ai-toolkit/screenshot": "*",
+    "@cli-ai-toolkit/imagegen": "*",
+    "commander": "^14.0.3",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
