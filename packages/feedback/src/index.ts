@@ -1,6 +1,9 @@
 // Gemini feedback library exports
 export { GeminiService, ImageComparisonResult, UICritiqueItem, UICritique } from './GeminiService.js';
 
+// OpenAI Vision exports
+export { OpenAIVisionService } from './OpenAIVisionService.js';
+
 // Pixel diff exports
 export { PixelDiffService, PixelDiffConfig, PixelDiffResult } from './PixelDiffService.js';
 

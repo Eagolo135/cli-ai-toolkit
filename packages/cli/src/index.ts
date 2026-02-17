@@ -3,9 +3,15 @@ import { Command as CommanderProgram } from 'commander';
 import dotenv from 'dotenv';
 import { Command } from '@cli-ai-toolkit/core';
 import { EnvValidator } from '@cli-ai-toolkit/utils';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Load environment variables
-dotenv.config();
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables from monorepo root
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 // Validate environment variables at startup
 EnvValidator.validateOrExit();
@@ -39,6 +45,11 @@ class CommandRegistry {
             cmd.option('-f, --file <path>', 'File to include in prompt');
         } else if (command.name === 'image-generate') {
             cmd.option('-s, --size <size>', 'Image size (1024x1024, 1792x1024, or 1024x1792)', '1024x1024');
+            cmd.option('--provider <name>', 'Provider: comfyui (default) or dalle', 'comfyui');
+            cmd.option('--negative <text>', 'Negative prompt (ComfyUI only)');
+            cmd.option('--steps <number>', 'Sampling steps (ComfyUI only, default: 20)');
+            cmd.option('--cfg <number>', 'CFG scale (ComfyUI only, default: 8)');
+            cmd.option('--seed <number>', 'Random seed (ComfyUI only, -1 for random)');
         } else if (command.name === 'web-search') {
             cmd.option('--mode <mode>', 'Search mode: agentic (default), weak, or deep-research', 'agentic');
             cmd.option('--reasoning <level>', 'Reasoning level: low, medium (default), high', 'medium');
@@ -51,6 +62,10 @@ class CommandRegistry {
             cmd.option('--viewport <size>', 'Viewport size (default: 1440x900)', '1440x900');
             cmd.option('--no-animations', 'Disable CSS animations');
             cmd.option('--out <dir>', 'Output directory (default: images/screenshots)');
+        } else if (command.name === 'recreate') {
+            cmd.option('--max-iterations <number>', 'Maximum iterations (default: 6)', '6');
+            cmd.option('--pixel-threshold <number>', 'Pixel diff pass threshold 0-100 (default: 92)', '92');
+            cmd.option('--vision-threshold <number>', 'Vision pass threshold 0-100 (default: 85)', '85');
         }
 
         cmd.action(async (...args: any[]) => {
@@ -68,6 +83,8 @@ class CommandRegistry {
                 } else if (command.name === 'image-generate' && args.length > 0) {
                     payload.prompt = args[0];
                 } else if (command.name === 'screenshot' && args.length > 0) {
+                    payload.url = args[0];
+                } else if (command.name === 'recreate' && args.length > 0) {
                     payload.url = args[0];
                 }
 
@@ -91,12 +108,14 @@ import { WebSearchCommand } from './commands/WebSearchCommand.js';
 import { GeminiCommand } from './commands/GeminiCommand.js';
 import { ImageGenerateCommand } from './commands/ImageGenerateCommand.js';
 import { ScreenshotCommand } from './commands/ScreenshotCommand.js';
+import { RecreateCommand } from './commands/RecreateCommand.js';
 
 try {
     registry.register(new WebSearchCommand(), '<query>');
     registry.register(new GeminiCommand(), '<prompt>');
     registry.register(new ImageGenerateCommand(), '<prompt>');
     registry.register(new ScreenshotCommand(), '<url>');
+    registry.register(new RecreateCommand(), '<url>');
 } catch (error: any) {
     console.error(`\n❌ Failed to initialize commands: ${error.message}`);
     process.exit(1);

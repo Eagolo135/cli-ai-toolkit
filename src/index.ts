@@ -91,12 +91,14 @@ import { WebSearchCommand } from './commands/WebSearchCommand.js';
 import { GeminiCommand } from './commands/GeminiCommand.js';
 import { ImageGenerateCommand } from './commands/ImageGenerateCommand.js';
 import { ScreenshotCommand } from './commands/ScreenshotCommand.js';
+import { RecreateCommand } from './commands/RecreateCommand.js';
 
 try {
     registry.register(new WebSearchCommand(), '<query>');
     registry.register(new GeminiCommand(), '<prompt>');
     registry.register(new ImageGenerateCommand(), '<prompt>');
     registry.register(new ScreenshotCommand(), '<url>');
+    registry.register(new RecreateCommand(), '<url>');
 } catch (error: any) {
     console.error(`\n❌ Failed to initialize commands: ${error.message}`);
     process.exit(1);

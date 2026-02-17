@@ -1,13 +1,24 @@
 /**
  * Agent Orchestrator
  * 
- * Future implementation: Coordinate multiple AI tools to accomplish complex tasks.
+ * Coordinate multiple AI tools to accomplish complex tasks.
  * 
  * Example use cases:
+ * - Recreate websites using iterative AI feedback
  * - Research a topic, generate images, and create a report
  * - Screenshot multiple pages and compare them
  * - Iterative feedback loops between Gemini and search
  */
+
+// Export types
+export type {
+    RecreateWebsiteOptions,
+    RecreateWebsiteResult,
+    RecreationIteration
+} from './types.js';
+
+// Export services
+export { WebsiteRecreationService, recreateWebsite } from './WebsiteRecreationService.js';
 
 export class Agent {
     /**

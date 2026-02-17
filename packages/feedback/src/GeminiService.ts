@@ -115,24 +115,83 @@ export class GeminiService {
 
                 const url = `${this.baseUrl}/gemini-2.0-flash-lite:generateContent?key=${this.apiKey}`;
 
-                const prompt = `You are an image comparison judge. Compare these two images based on the following goal/criteria:
+                const prompt = `ROLE
+
+You are a strict visual quality judge and art director.
+
+You NEVER generate code.
+You NEVER modify files.
+You ONLY evaluate and critique.
+
+You analyze images and screenshots and determine:
+- correctness
+- quality
+- similarity
+- completeness
+- visual accuracy
+
+---
+
+TASK
+
+Evaluate the provided images.
+
+Image A (TARGET):
+The reference / expected output
+[First image]
+
+Image B (CANDIDATE):
+The generated output to evaluate
+[Second image]
 
 GOAL: ${goal}
 
-TARGET IMAGE (reference):
-[First image]
+Determine how closely Image B matches Image A.
 
-CANDIDATE IMAGE (to evaluate):
-[Second image]
+---
 
-Evaluate how well the candidate image meets the goal compared to the target image.
+EVALUATION CRITERIA
 
-Respond in this EXACT JSON format (no markdown, no code blocks):
+Analyze:
+- Layout structure
+- Spacing and alignment  
+- Typography (font size, weight, style)
+- Color accuracy
+- Component shapes
+- Padding and margins
+- Image placement
+- Overall visual hierarchy
+
+---
+
+OUTPUT FORMAT
+
+Return ONLY valid JSON (no markdown, no code blocks):
 {
-  "pass": true/false,
   "score": <number 0-100>,
-  "notes": "Brief explanation of the evaluation"
-}`;
+  "pass": <boolean>,
+  "notes": "short overall assessment"
+}
+
+---
+
+SCORING RULES
+
+100 = visually identical
+90+ = nearly identical
+70–89 = recognizable but flawed
+50–69 = significant errors
+below 50 = poor match
+
+pass = true only if score >= 85
+
+---
+
+CRITICAL RULE
+
+You do NOT generate code.
+You ONLY describe what must be fixed.
+You are a judge, not a builder.`;
 
                 const response = await axios.post(
                     url,
@@ -212,16 +271,43 @@ Respond in this EXACT JSON format (no markdown, no code blocks):
 
                 const url = `${this.baseUrl}/gemini-2.0-flash-lite:generateContent?key=${this.apiKey}`;
 
-                const prompt = `You are a UI/UX expert analyzing screenshot differences. Compare these two screenshots in EXTREME DETAIL.
+                const prompt = `ROLE
 
-TARGET (Expected/Reference):
+You are a strict visual quality judge and UI/UX art director.
+
+You NEVER generate code.
+You NEVER modify files.
+You ONLY evaluate and critique.
+
+You analyze screenshots and determine:
+- visual accuracy
+- layout correctness
+- typography precision
+- color matching
+- spacing consistency
+
+---
+
+TASK
+
+Evaluate the provided screenshots.
+
+Image A (TARGET):
+The reference / expected UI
 [First image]
 
-CANDIDATE (Actual/Current):
+Image B (CANDIDATE):
+The generated UI to evaluate
 [Second image]
 ${context ? `\nCONTEXT: ${context}` : ''}
 
-Identify 5-10 CONCRETE, ACTIONABLE UI differences. Focus on:
+Identify 5-10 CONCRETE, ACTIONABLE UI differences.
+
+---
+
+EVALUATION CRITERIA
+
+Analyze:
 - Layout: positioning, margins, padding, spacing
 - Typography: font family, size, weight, line-height, letter-spacing
 - Colors: hex values, opacity, gradients
@@ -230,33 +316,42 @@ Identify 5-10 CONCRETE, ACTIONABLE UI differences. Focus on:
 - Borders: radius, width, color, style
 - Specific measurements where possible
 
-For each difference, identify:
-1. The SPECIFIC UI element (e.g., "Header logo", "Primary CTA button", "Navigation menu")
-2. The EXACT issue (e.g., "padding-left is 12px")
-3. What it SHOULD be (from target)
-4. What it ACTUALLY is (in candidate)
-5. Priority level
+---
 
-Prioritize by visual impact:
-- critical: breaks layout or makes UI unusable
-- high: very noticeable, affects user experience
-- medium: noticeable but minor impact
-- low: subtle difference, minimal impact
+OUTPUT FORMAT
 
-Respond in this EXACT JSON format (no markdown, no code blocks):
+Return ONLY valid JSON (no markdown, no code blocks):
 {
-  "summary": "Brief 1-2 sentence overview of differences",
+  "summary": "Brief 1-2 sentence overview",
   "items": [
     {
       "priority": "critical|high|medium|low",
       "category": "layout|typography|colors|spacing|sizing|alignment|borders|other",
       "element": "Specific UI element name",
       "issue": "What's wrong",
-      "expected": "What target shows (be specific with values)",
-      "actual": "What candidate shows (be specific with values)"
+      "expected": "What target shows (be specific)",
+      "actual": "What candidate shows (be specific)"
     }
   ]
-}`;
+}
+
+---
+
+PRIORITY RULES
+
+critical: breaks layout or makes UI unusable
+high: very noticeable, affects user experience
+medium: noticeable but minor impact
+low: subtle difference, minimal impact
+
+---
+
+CRITICAL RULE
+
+You do NOT generate code.
+You ONLY describe what must be fixed.
+The coding agent will use your instructions.
+You are a judge, not a builder.`;
 
                 const response = await axios.post(
                     url,
@@ -305,6 +400,91 @@ Respond in this EXACT JSON format (no markdown, no code blocks):
             },
             { maxRetries: 2, timeoutMs: 70000 },
             'Gemini Vision API (UI Critique)'
+        );
+    }
+
+    /**
+     * Generate HTML/CSS code from a screenshot
+     * @param screenshotPath - Path to the screenshot image
+     * @param additionalContext - Optional context or revision notes
+     * @returns Complete HTML with embedded CSS
+     */
+    async generateHTMLFromScreenshot(
+        screenshotPath: string,
+        additionalContext?: string
+    ): Promise<string> {
+        return APIResilience.executeWithRetry(
+            async () => {
+                // Read and encode image as base64
+                const imageBuffer = await fs.readFile(screenshotPath);
+                const imageBase64 = imageBuffer.toString('base64');
+
+                // Determine MIME type
+                const imageMime = screenshotPath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+                const url = `${this.baseUrl}/gemini-2.0-flash-lite:generateContent?key=${this.apiKey}`;
+
+                const basePrompt = `You are an expert web developer. Analyze this screenshot and recreate it as a complete, standalone HTML page with embedded CSS.
+
+REQUIREMENTS:
+1. Create a SINGLE HTML file with all CSS embedded in <style> tags
+2. Match the layout, colors, typography, spacing, and styling EXACTLY
+3. Use semantic HTML5 elements
+4. Make it responsive and pixel-perfect
+5. Include all visible text, buttons, images (use placeholder images if needed)
+6. Use modern CSS (flexbox/grid where appropriate)
+7. Match fonts as closely as possible (use web-safe fonts or Google Fonts)
+8. Pay attention to: padding, margins, colors (exact hex values), font sizes, borders, shadows
+
+${additionalContext ? `\nREVISION NOTES:\n${additionalContext}\n\nAddress these issues in your implementation.` : ''}
+
+Output ONLY the complete HTML code. Do NOT include markdown code blocks or explanations. Start with <!DOCTYPE html>`;
+
+                const response = await axios.post(
+                    url,
+                    {
+                        contents: [{
+                            parts: [
+                                { text: basePrompt },
+                                {
+                                    inline_data: {
+                                        mime_type: imageMime,
+                                        data: imageBase64
+                                    }
+                                }
+                            ]
+                        }]
+                    },
+                    {
+                        timeout: 90000, // 90 seconds for complex generation
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                const content = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (!content) {
+                    throw new Error('No response generated by Gemini Vision API');
+                }
+
+                // Clean up markdown code blocks if present
+                let cleaned = content.trim();
+                cleaned = cleaned.replace(/^```html\s*/m, '');
+                cleaned = cleaned.replace(/^```\s*/m, '');
+                cleaned = cleaned.replace(/```\s*$/m, '');
+                cleaned = cleaned.trim();
+
+                // Validate it looks like HTML
+                if (!cleaned.toLowerCase().includes('<!doctype html') && !cleaned.toLowerCase().includes('<html')) {
+                    throw new Error('Generated content does not appear to be valid HTML');
+                }
+
+                return cleaned;
+            },
+            { maxRetries: 2, timeoutMs: 100000 },
+            'Gemini Vision API (HTML Generation)'
         );
     }
 }
