@@ -6,3 +6,6 @@ references/
 images/
 coverage/
 npm-debug.log
+
+# TypeScript build info
+*.tsbuildinfo
