@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import { APIResilience } from '../utils/APIResilience.js';
+import { SearchService } from './SearchService.js';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ export interface SearchResult {
 
 export class OpenAIService {
     private openai: OpenAI;
+    private searchService: SearchService;
 
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY;
@@ -32,6 +34,7 @@ export class OpenAIService {
             timeout: 45000, // 45 second default timeout
             maxRetries: 0 // We handle retries ourselves
         });
+        this.searchService = new SearchService();
     }
 
     /**
@@ -60,6 +63,7 @@ export class OpenAIService {
 
     /**
      * Enhanced web search with agentic reasoning and deep research
+     * Uses optimized searching for medium level (fast & efficient)
      */
     async agenticWebSearch(options: WebSearchOptions): Promise<SearchResult> {
         const mode = options.mode || 'agentic';
@@ -69,50 +73,65 @@ export class OpenAIService {
         let model = options.model;
         let timeout = 50000; // Default 50 seconds
         let maxRetries = 2;
+        let numSearches = 3; // Optimized for speed
 
         if (!model) {
             if (mode === 'deep-research') {
-                // Deep research uses specialized models
-                model = 'gpt-4o'; // Fallback to gpt-4o if o3/gpt-5 not available
+                model = 'gpt-4o';
                 timeout = 300000; // 5 minutes for deep research
-                maxRetries = 1; // Less retries for long operations
+                maxRetries = 1;
+                numSearches = 10;
             } else if (mode === 'agentic') {
-                // Agentic search with reasoning
+                // Agentic search with reasoning - optimized for speed and cost
+                model = 'gpt-4o-mini';
                 if (reasoningLevel === 'high') {
-                    model = 'gpt-4o';
-                    timeout = 180000; // 3 minutes for high reasoning
+                    timeout = 90000; // 1.5 minutes for high reasoning
+                    numSearches = 5;
+                } else if (reasoningLevel === 'medium') {
+                    timeout = 45000; // 45 seconds for medium reasoning (optimized)
+                    numSearches = 3; // Reduced from 5 for speed
                 } else {
-                    model = 'gpt-4o-mini';
-                    timeout = 90000; // 1.5 minutes for medium/low reasoning
+                    timeout = 30000;
+                    numSearches = 2;
                 }
             } else {
                 // Weak/quick search
                 model = 'gpt-4o-mini';
-                timeout = 50000;
+                timeout = 30000;
+                numSearches = 2;
             }
         }
 
-        const prompt = this.buildSearchPrompt(options.query, mode, reasoningLevel);
-
         console.log(`   Model: ${model}`);
         console.log(`   Reasoning Level: ${reasoningLevel}`);
+        console.log(`   🌐 Using Tavily API for live web searches...`);
         if (mode === 'deep-research') {
             console.log(`   ⚠️  Deep research may take several minutes...\n`);
         } else if (mode === 'agentic') {
-            console.log(`   🤖 Agentic search will analyze and search iteratively...\n`);
+            console.log(`   🤖 Agentic mode will analyze live search results...\n`);
         }
 
         return APIResilience.executeWithRetry(
             async () => {
                 const startTime = Date.now();
                 
+                // Perform live web searches via Tavily
+                const searchResults = await this.performLiveSearches(options.query, numSearches, reasoningLevel);
+                
+                const searchTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                console.log(`   ✓ Completed ${numSearches} live searches in ${searchTime}s`);
+                console.log(`   🤖 Analyzing results with AI...\n`);
+                
+                // Analyze search results with AI
+                const analysisPrompt = this.buildAnalysisPrompt(options.query, searchResults, mode, reasoningLevel);
+                
                 const response = await this.openai.chat.completions.create({
                     model: model,
                     messages: [{ 
                         role: 'user', 
-                        content: prompt 
+                        content: analysisPrompt 
                     }],
-                    temperature: mode === 'deep-research' ? 0.3 : 0.7, // Lower temp for research
+                    temperature: mode === 'deep-research' ? 0.3 : 0.7,
                 });
 
                 const content = response.choices[0]?.message?.content;
@@ -122,7 +141,7 @@ export class OpenAIService {
                 }
 
                 const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
-                console.log(`   ✓ Search completed in ${elapsedTime}s`);
+                console.log(`   ✓ Search completed in ${elapsedTime}s total`);
                 
                 return {
                     content,
@@ -138,52 +157,158 @@ export class OpenAIService {
     }
 
     /**
-     * Build search prompt based on mode and reasoning level
+     * Build search prompt for OpenAI knowledge synthesis
      */
     private buildSearchPrompt(query: string, mode: string, reasoningLevel: string): string {
         if (mode === 'deep-research') {
-            return `You are a deep research assistant. Conduct comprehensive research on the following query. 
+            return `Provide comprehensive research and analysis on: "${query}"
 
-Query: "${query}"
+Use your knowledge to gather information as if from multiple authoritative sources.
 
-Instructions:
-1. Search multiple authoritative sources (aim for 10+ sources)
-2. Analyze and synthesize information from different perspectives
-3. Provide detailed, fact-based answers with citations
-4. Include statistics, dates, and specific examples where relevant
-5. Organize findings into clear sections
-6. Conclude with a summary of key findings
+Requirements:
+- Provide detailed, fact-based answers
+- Include statistics, dates, and specific examples where relevant
+- Organize findings into clear sections
+- Note what information might be outdated based on your knowledge cutoff
+- Conclude with a summary of key findings
 
 Deliver a thorough research report.`;
         } else if (mode === 'agentic') {
-            const reasoningInstructions = {
-                low: 'Perform 2-3 targeted searches and provide a concise summary.',
-                medium: 'Perform 5-7 searches, analyze results, and synthesize findings with supporting details.',
-                high: 'Perform 10+ searches, deeply analyze all perspectives, evaluate source credibility, and provide comprehensive analysis with extensive citations.'
+            const instructions = {
+                low: 'Provide a concise summary with key facts.',
+                medium: 'Analyze from multiple perspectives and synthesize findings with supporting details.',
+                high: 'Deeply analyze all perspectives, evaluate information credibility, and provide comprehensive analysis.'
             };
 
-            return `You are an agentic search assistant with web access. Use your reasoning abilities to search and analyze information.
-
-Query: "${query}"
+            return `Provide comprehensive information about: "${query}"
 
 Reasoning Level: ${reasoningLevel}
-Instructions: ${reasoningInstructions[reasoningLevel as keyof typeof reasoningInstructions]}
+Instructions: ${instructions[reasoningLevel as keyof typeof instructions]}
 
-Provide:
-- Search strategy used
-- Key findings from multiple sources
-- Source citations (URLs when possible)
-- Synthesized conclusions
-- Confidence level in findings`;
+Requirements:
+- Provide current, accurate information based on your knowledge
+- Share specific facts, statistics, and examples
+- Structure response clearly
+- Note your knowledge cutoff date if relevant
+- Include confidence levels where appropriate`;
         } else {
             // Quick search
-            return `Search the web and provide factual sources and summaries for: ${query}
+            return `Provide information about: "${query}"
 
-Provide:
+Include:
 - Direct answer to the query
-- Key facts and statistics
-- 3-5 relevant source citations
-- Brief summary`;
+- Key facts and statistics (3-5 main points)
+- Brief, factual summary
+
+Focus on accurate, relevant information from your knowledge base.`;
+        }
+    }
+
+    /**
+     * Perform multiple live web searches with query variations
+     */
+    private async performLiveSearches(
+        originalQuery: string, 
+        numSearches: number,
+        reasoningLevel: string
+    ): Promise<string> {
+        const queries: string[] = [originalQuery];
+        
+        // Generate query variations for more comprehensive search
+        if (numSearches > 1) {
+            if (reasoningLevel === 'medium' || reasoningLevel === 'high') {
+                queries.push(`${originalQuery} information`);
+                queries.push(`${originalQuery} details`);
+            }
+            if (reasoningLevel === 'high') {
+                queries.push(`${originalQuery} overview`);
+                queries.push(`${originalQuery} about`);
+                queries.push(`${originalQuery} facts`);
+                queries.push(`what is ${originalQuery}`);
+            }
+        }
+        
+        // Limit to requested number of searches
+        const searchQueries = queries.slice(0, numSearches);
+        
+        // Perform all searches
+        const searchPromises = searchQueries.map(async (query, index) => {
+            try {
+                console.log(`   🔍 Search ${index + 1}/${searchQueries.length}: "${query}"`);
+                const results = await this.searchService.search(query);
+                return `\n=== Search ${index + 1}: "${query}" ===\n${results}`;
+            } catch (error: any) {
+                console.warn(`   ⚠️  Search ${index + 1} failed: ${error.message}`);
+                return `\n=== Search ${index + 1}: "${query}" ===\nSearch failed: ${error.message}`;
+            }
+        });
+        
+        const results = await Promise.all(searchPromises);
+        return results.join('\n\n');
+    }
+
+    /**
+     * Build analysis prompt for AI to analyze live search results
+     */
+    private buildAnalysisPrompt(
+        query: string, 
+        searchResults: string, 
+        mode: string, 
+        reasoningLevel: string
+    ): string {
+        const basePrompt = `You are an expert research analyst. I have performed live web searches using Tavily API and need you to analyze the results.
+
+Original Query: "${query}"
+
+LIVE SEARCH RESULTS FROM TAVILY:
+${searchResults}
+
+`;
+
+        if (mode === 'deep-research') {
+            return basePrompt + `Your Task: Conduct comprehensive analysis
+- Synthesize information from all search results
+- Identify key themes and patterns
+- Provide detailed insights with specific examples
+- Include source citations with URLs
+- Organize findings into clear sections
+- Note any conflicting information
+- Conclude with key findings summary
+
+Deliver a thorough, well-structured research analysis.`;
+        } else if (mode === 'agentic') {
+            if (reasoningLevel === 'high') {
+                return basePrompt + `Your Task: Deep analytical synthesis
+- Analyze all search results comprehensively
+- Evaluate source credibility and relevance
+- Cross-reference information across sources
+- Identify patterns, trends, and insights
+- Provide detailed explanations with citations
+- Note confidence levels and data quality
+- Conclude with comprehensive synthesis`;
+            } else if (reasoningLevel === 'medium') {
+                return basePrompt + `Your Task: Balanced analysis and synthesis
+- Analyze key information from the search results
+- Synthesize main findings into clear points
+- Include relevant citations and URLs
+- Provide context and brief explanations
+- Note any important patterns or insights
+- Conclude with a concise summary`;
+            } else {
+                return basePrompt + `Your Task: Quick summary
+- Extract the most relevant information
+- Provide a concise summary
+- Include 3-5 key points
+- Cite main sources with URLs
+- Keep it focused and actionable`;
+            }
+        } else {
+            // Quick search
+            return basePrompt + `Your Task: Quick factual summary
+- Provide direct answer to the query
+- List key facts and information
+- Include top 3-5 source URLs
+- Keep it brief and factual`;
         }
     }
 
